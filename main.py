@@ -334,7 +334,7 @@ def start_browser():
     options.binary_location = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
     options.add_argument('--allow-profiles-outside-user-dir')
     options.add_argument('--enable-profile-shortcut-manager')
-    options.add_argument(r'user-data-dir=C:\Users\Кирилл\PycharmProjects\Robotex\userdata')  # УКАЖИТЕ ПУТЬ ГДЕ ЛЕЖИТ ВАШ ФАЙЛ. Советую создать отдельную папку.
+    options.add_argument(fr'user-data-dir={os.path.abspath(__file__)[:-8]}\userdata')
     options.add_argument('--profile-directory=Profile 1')
     options.add_argument('--profiling-flush=n')
     options.add_argument('--enable-aggressive-domstorage-flushing')
@@ -589,7 +589,7 @@ async def work_with_getted_messages():
                             if finded:
                                 result_db.at[need_i, 'День'] = day
                                 result_db.at[need_i, 'Время'] = time
-                                result_db.at[need_i, 'Итог'] = 'Записаны'
+                                result_db.at[need_i, 'Итог'] = 'Записан'
 
                                 msg = f'Спасибо за ответ! Вы записаны в {day} на {time}, будем вас ждать!\n' \
                                       f'В ближайшее время с вами свяжется наш менеджер для подтверждения записи.\n' \
@@ -609,7 +609,7 @@ async def work_with_getted_messages():
                             await send_message(number, 'Пожалуйста, проверьте что вы ввели данные в правильном формате! Пример правильного формата:\n'
                                                        'Понедельник 17:30')
 
-                    elif user_com == 'Записаны':
+                    elif user_com == 'Записан':
                         await send_message(ADMIN, f'Пользователь {number} написал сообщениe:\n'
                                                   f'{". ".join(msgs)}')
 
