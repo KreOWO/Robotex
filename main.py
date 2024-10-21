@@ -13,10 +13,22 @@ from datetime import datetime, timedelta
 import pandas
 import asyncio
 import re
-from messages import *
 import pyperclip
 
 global admin_com, ADMINS, browser_task, rassl_week_days, rassl_time, working, user_com, new_result_db
+
+
+def save_db():
+    with pandas.ExcelWriter('result.xlsx', engine='xlsxwriter') as writer:
+        result_db.to_excel(writer, index=False, sheet_name='result')
+
+        # Получаем объект workbook и worksheet
+        workbook = writer.book
+        worksheet = writer.sheets['result']
+
+        # Применяем текстовый формат к столбцу 'Номер'
+        text_format = workbook.add_format({'num_format': '@'})  # '@' означает текст
+        worksheet.set_column('A:A', None, text_format)
 
 
 try:
@@ -24,13 +36,11 @@ try:
     for column in ['Номер', 'Имя ребенка', 'Возраст ребенка', 'День', 'Время', 'Итог']:
         result_db[column] = result_db[column].astype(str)
 except:
-    df = pandas.DataFrame(columns=['Номер', 'Имя ребенка', 'Возраст ребенка', 'День', 'Время', 'Итог'])
-    excel_writer = pandas.ExcelWriter('result.xlsx', engine='xlsxwriter')
-    df.to_excel(excel_writer, index=False, sheet_name='result', freeze_panes=(1, 0))
-    excel_writer._save()
+    result_db = pandas.DataFrame(columns=['Номер', 'Имя ребенка', 'Возраст ребенка', 'День', 'Время', 'Итог'])
+    save_db()
 
 if not os.path.isdir("userdata"):
-     os.mkdir("userdata")
+    os.mkdir("userdata")
 
 browser_task = 'chill'
 # ADMIN = '+79890804510'
@@ -194,20 +204,6 @@ async def send_message(to_number, text):
             return 'Неизвестная ошибка'
 
 
-def save_db():
-    with pandas.ExcelWriter('result.xlsx', engine='xlsxwriter') as writer:
-
-        result_db.to_excel(writer, index=False, sheet_name='result')
-
-        # Получаем объект workbook и worksheet
-        workbook = writer.book
-        worksheet = writer.sheets['result']
-
-        # Применяем текстовый формат к столбцу 'Номер'
-        text_format = workbook.add_format({'num_format': '@'})  # '@' означает текст
-        worksheet.set_column('A:A', None, text_format)
-
-
 # Основная функция для отправки сообщений по таймеру в указанные дни
 async def send_messages_in_interval():
     global browser, browser_task, result_db, working
@@ -226,12 +222,16 @@ async def send_messages_in_interval():
             print('Неизвестная ошибка, обратитесь к программисту')
             await asyncio.sleep(10)
 
-    print(f'Найдено номеров разных лидов: {len(phone_numbers)}')
-
     try:
-        wasnumbers = ['+' + i for i in result_db['Номер'].tolist()]
+        wasnumbers = [convert_to_e164(i) for i in result_db['Номер'].tolist()]
     except:
         wasnumbers = []
+
+    for number in phone_numbers:
+        if number in wasnumbers:
+            phone_numbers.remove(number)
+
+    print(f'Осталось разослать: {len(phone_numbers)}/{len(phone_numbers) + len(wasnumbers)}')
 
     # Цикл отправки сообщений
     for number in phone_numbers:
@@ -239,9 +239,6 @@ async def send_messages_in_interval():
             print("Рассылка приостановлена")
             await asyncio.sleep(10)
 
-        if number in wasnumbers:
-            print(f'На номер {number} уже отправлено')
-            continue
         # Получаем текущее время и день недели
         now = datetime.now()
         weekday = now.weekday()
@@ -409,7 +406,10 @@ async def work_with_getted_messages():
 
                         elif msgs[0].startswith('изменить расписание'):
                             if msgs[0] == 'изменить расписание':
-                                await send_message(number, WRONG_GROUP)
+                                await send_message(number, f'Вы не выбрали группу для изменения расписания.\n'
+                                                           f'Примеры правильного ввода:\n'
+                                                           f'Изменить расписание спайк\n'
+                                                           f'Изменить расписание город роботов понедельник')
                                 continue
                             else:
                                 group_day = (msgs[0][len('изменить расписание '):] + ' ').split(' ')
@@ -453,9 +453,11 @@ async def work_with_getted_messages():
 
                                     await send_message(number, f'Время рассылки установлено на {newtime}')
                                 except:
-                                    await send_message(number, WRONG_RASSL_TIME_MSG)
+                                    await send_message(number, f'Неправильно введено время рассылки, правильный формат команды:\n'
+                                                               f'Изменить время рассылки 8:00-21:00')
                             else:
-                                await send_message(number, WRONG_RASSL_TIME_MSG)
+                                await send_message(number, f'Неправильно введено время рассылки, правильный формат команды:\n'
+                                                           f'Изменить время рассылки 8:00-21:00')
 
                         elif msgs[0].startswith('изменить дни рассылки'):
                             days_list = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
@@ -479,7 +481,21 @@ async def work_with_getted_messages():
                             await send_message(number, get_rassl_info())
 
                         else:
-                            await send_message(number, ADMINS_MSG)
+                            await send_message(number, "Бот не знает такой команды, вот список доступных:\n"
+                                                       "1. Получить текст рассылки\n"
+                                                       "2. Изменить текст рассылки\n"
+                                                       "3. Получить расписание (название группы). Например:\n"
+                                                       "Получить расписание город роботов"
+                                                       "(Группу можно оставить пустой, тогда бот пришлёт расписание всех групп)\n"
+                                                       "4. Изменить расписание (название группы). Например:\n"
+                                                       "Изменить расписание первые шаги\n"
+                                                       "5. Получить информацию о рассылке\n"
+                                                       "6. Изменить время рассылки (с-до). Например:\n"
+                                                       "Изменить время рассылки 8:00-21:00\n"
+                                                       "7. Изменить дни рассылки (пн вт ср чт пт сб вс). Например:\n"
+                                                       "Изменить дни рассылки пн ср пт\n"
+                                                       "8. Запустить рассылку\n"
+                                                       "9. Остановить рассылку")
                         continue
 
                     elif admin_com[number] == 'new-text':
@@ -538,22 +554,27 @@ async def work_with_getted_messages():
                             c_name, age = msgs[0].split(' ')
                             age = int(age)
                             msg = ''
-                            for group in groups:
-                                if group.age[0] <= age <= group.age[1]:
-                                    msg += group.get_days_msg() + '\n\n'
-                            if not msg:
-                                await send_message(number, 'Спасибо за ваш ответ! К сожалению для детей такого возраста у нас нет занятий.')
-                            else:
-                                msg += 'Пожалуйста, введите день недели и время, в которое вы бы хотели посетить занятие. Например:\n' \
-                                       'Понедельник 17:30'
-                                result_db.at[need_i, 'Имя ребенка'] = c_name
-                                result_db.at[need_i, 'Возраст ребенка'] = age
-                                result_db.at[need_i, 'Итог'] = 'Ожидание выбора дня и времени'
-                                await send_message(number, msg)
-
                         except:
                             await send_message(number, 'Пожалуйста, проверьте что вы ввели данные в правильном формате! Пример правильного формата:\n'
                                                        'Иван 9')
+                            continue
+
+                        for group in groups:
+                            if group.age[0] <= age <= group.age[1]:
+                                msg += group.get_days_msg() + '\n\n'
+                        if not msg:
+                            await send_message(number, 'Спасибо за ваш ответ! К сожалению я затрудняюсь предложить вам варианты расписания для записи. '
+                                                       'В ближайшее время с вами свяжется менеджер!')
+                            await send_message(ADMIN, f'Пользователь {number} ({c_name} {age}) не подходит по возрасту!')
+                            result_db.at[need_i, 'Итог'] = 'Нет групп для этого возраста'
+                        else:
+                            msg += 'Пожалуйста, введите день недели и время, в которое вы бы хотели посетить занятие. Например:\n' \
+                                   'Понедельник 17:30'
+                            result_db.at[need_i, 'Имя ребенка'] = c_name
+                            result_db.at[need_i, 'Возраст ребенка'] = age
+                            result_db.at[need_i, 'Итог'] = 'Ожидание выбора дня и времени'
+                            await send_message(number, msg)
+
                     elif user_com == 'Ожидание выбора дня и времени':
                         try:
                             day, time = msgs[0].split(' ')
@@ -571,19 +592,25 @@ async def work_with_getted_messages():
                                 result_db.at[need_i, 'Итог'] = 'Записаны'
 
                                 msg = f'Спасибо за ответ! Вы записаны в {day} на {time}, будем вас ждать!\n' \
-                                      f'Если появятся какие-либо вопросы, можете написать их сюда, я обязательно сообщу администратору и с вами свяжутся!'
+                                      f'В ближайшее время с вами свяжется наш менеджер для подтверждения записи.\n' \
+                                      f'Будем ждать вас!'
                                 await send_message(number, msg)
-                                await send_message(ADMIN, f'Пользователь {number} записался в {day} на {time}')
+                                await send_message(ADMIN, f'Пользователь {number} ({result_db.at[need_i, "Имя ребенка"]} {result_db.at[need_i, "Возраст ребенка"]}) '
+                                                          f'записался в {day} на {time}\n')
+
                             else:
-                                await send_message(number, 'Пожалуйста, проверьте что вы ввели данные в правильном формате и указали правильное время! Пример правильного формата:\n'
-                                                           'Понедельник 17:30')
+                                await send_message(number, 'Вероятно предложенные варианты вам не подходят. '
+                                                           'В ближайшее время с вами свяжется менеджер и сориентирует по вариантам для записи.')
+
+                                await send_message(ADMIN, f'Пользователь {number} ввёл не существующее время:\n'
+                                                          f'{". ".join(msgs)}')
 
                         except:
                             await send_message(number, 'Пожалуйста, проверьте что вы ввели данные в правильном формате! Пример правильного формата:\n'
                                                        'Понедельник 17:30')
 
                     elif user_com == 'Записаны':
-                        await send_message(ADMIN, f'Пользователь {number} написал сообщениу:\n'
+                        await send_message(ADMIN, f'Пользователь {number} написал сообщениe:\n'
                                                   f'{". ".join(msgs)}')
 
             save_db()
