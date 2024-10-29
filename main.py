@@ -18,6 +18,10 @@ import pyperclip
 global admin_com, ADMINS, browser_task, rassl_week_days, rassl_time, working, user_com, new_result_db
 
 
+ADMIN = 'Введите админский номер сюда'
+ADMINS = [ADMIN, 'Номер1', 'Номер2', '...']
+
+
 def save_db():
     with pandas.ExcelWriter('result.xlsx', engine='xlsxwriter') as writer:
         result_db.to_excel(writer, index=False, sheet_name='result')
@@ -43,10 +47,6 @@ if not os.path.isdir("userdata"):
     os.mkdir("userdata")
 
 browser_task = 'chill'
-# ADMIN = '+79890804510'
-ADMIN = '+79999967109'
-ADMINS = ['+79890804510', '+79999967109']
-# ADMINS = ['+7 989 080-45-10']
 admin_com = {}
 
 working = False
@@ -288,7 +288,7 @@ async def get_messages():
 
     # Найти все чаты на боковой панели
     chats = browser.find_elements(By.XPATH, '//div[@aria-label="Список чатов"]/div')
-    chats = [[int(chat.value_of_css_property('transform').split(' ')[-1][:-1]), chat] for chat in chats]
+    chats = [[chat.location['y'], chat] for chat in chats]
     chats = sorted(chats, key=lambda point: (point[0]))
     opened = False
     for loc, chat in chats:
@@ -331,7 +331,7 @@ async def get_messages():
 def start_browser():
     global browser
     options = Options()
-    options.binary_location = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
+    options.binary_location = r'C:\Program Files\Google\Chrome\Application\chrome.exe'
     options.add_argument('--allow-profiles-outside-user-dir')
     options.add_argument('--enable-profile-shortcut-manager')
     options.add_argument(fr'user-data-dir={os.path.abspath(__file__)[:-8]}\userdata')
@@ -348,9 +348,10 @@ def start_browser():
     try:
         web_wait(browser, By.XPATH, '//canvas[@aria-label="Scan this QR code to link a device!"]')
         print('Отсканируй QR')
-        web_wait(browser, By.ID, 'pane-side', 60)
-    finally:
+        web_wait(browser, By.ID, 'pane-side', 80)
         return browser
+    except:
+        print('Неизвестная ошибка при запуске браузера start_browser')
 
 
 def get_rassl_info():
