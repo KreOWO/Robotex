@@ -18,7 +18,7 @@ import pyperclip
 global admin_com, ADMINS, browser_task, rassl_week_days, rassl_time, working, user_com, new_result_db
 
 
-ADMIN = 'Введите админский номер сюда'
+ADMIN = '+79535067689'  # Поле для ввода админского номера
 ADMINS = [ADMIN, 'Номер1', 'Номер2', '...']
 
 
@@ -205,15 +205,18 @@ async def send_message(to_number, text):
 
 
 # Основная функция для отправки сообщений по таймеру в указанные дни
-async def send_messages_in_interval():
-    global browser, browser_task, result_db, working
+async def send_messages_in_interval(browser):
+    global browser_task, result_db, working
     # Получаем список номеров телефонов
+    tnf = False
     while True:
         phone_numbers, msg = get_phone_numbers_from_excel()
         if msg == 'ok':
             break
         if msg == 'no table':
-            print('Таблица с номерами не найдена!')
+            if not tnf:
+                print('Таблица с номерами не найдена!')
+                tnf = True
             await asyncio.sleep(10)
         if msg == 'not found':
             print('В строках таблицы не найдены номера, убедитесь что вы загрузили нужную таблицу')
@@ -272,8 +275,8 @@ async def send_messages_in_interval():
 
 
 # Функция для получения сообщений из чатов
-async def get_messages():
-    global browser, browser_task
+async def get_messages(browser):
+    global browser_task
     """
     Получает новые сообщения из чатов WhatsApp.
 
@@ -345,13 +348,18 @@ def start_browser():
     url = f"https://web.whatsapp.com"
     browser = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     browser.get(url)
-    try:
-        web_wait(browser, By.XPATH, '//canvas[@aria-label="Scan this QR code to link a device!"]')
-        print('Отсканируй QR')
-        web_wait(browser, By.ID, 'pane-side', 80)
-        return browser
-    except:
-        print('Неизвестная ошибка при запуске браузера start_browser')
+    for i in range(15):
+        try:
+            web_wait(browser, By.XPATH, '//canvas[@aria-label="Scan this QR code to link a device!"]', 10)
+            print('Отсканируйте QR')
+        except:
+            print(f'Ожидание qr кода, попытка {i + 1}/10) start_browser')
+
+        try:
+            web_wait(browser, By.ID, 'pane-side', 80)
+            return browser
+        except:
+            print(f'Ожидание загрузки страницы или входа в аккаунт {i + 1}/10 start_browser')
 
 
 def get_rassl_info():
@@ -368,12 +376,12 @@ def get_rassl_info():
     return msg
 
 
-async def work_with_getted_messages():
+async def work_with_getted_messages(browser):
     global browser_task, admin_com, message_text, rassl_week_days, rassl_time, working, user_com
     while True:
         await asyncio.sleep(5)
 
-        msg_dict = await get_messages()
+        msg_dict = await get_messages(browser)
 
         if msg_dict:
             for number, msgs in msg_dict.items():
@@ -618,9 +626,10 @@ async def work_with_getted_messages():
 
 
 async def undermain():
-    global browser
+    print('Запуск бота')
     browser = start_browser()
-    await asyncio.gather(work_with_getted_messages(), send_messages_in_interval())
+    print('Успешный вход в аккаунт, запуск чтения и рассылки сообщений')
+    await asyncio.gather(work_with_getted_messages(browser), send_messages_in_interval(browser))
 
 
 # Пример использования
