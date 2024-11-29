@@ -291,8 +291,6 @@ async def get_messages(browser):
 
     # Найти все чаты на боковой панели
     chats = browser.find_elements(By.XPATH, '//div[@aria-label="Список чатов"]/div')
-    chats = [[chat.location['y'], chat] for chat in chats]
-    chats = sorted(chats, key=lambda point: (point[0]))
     opened = False
     for loc, chat in chats:
         info = chat.text.split('\n')
