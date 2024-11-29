@@ -18,7 +18,7 @@ import pyperclip
 global admin_com, ADMINS, browser_task, rassl_week_days, rassl_time, working, user_com, new_result_db
 
 
-ADMIN = '+79535067689'  # Поле для ввода админского номера
+ADMIN = '+79890804510'  # Поле для ввода админского номера
 ADMINS = [ADMIN, 'Номер1', 'Номер2', '...']
 
 
@@ -292,7 +292,7 @@ async def get_messages(browser):
     # Найти все чаты на боковой панели
     chats = browser.find_elements(By.XPATH, '//div[@aria-label="Список чатов"]/div')
     opened = False
-    for loc, chat in chats:
+    for chat in chats:
         info = chat.text.split('\n')
         if len(info) == 4:
             try:
